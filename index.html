@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Seyir Defteri — Selim & Cenk</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&display=swap">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --whitewash:#EDE9DE; --paper:#F7F4EC; --ink:#1B2A4A; --aegean:#2C6E9E;
+    --terracotta:#BF5730; --gold:#C89B3C; --line:#D8D2C2; --muted:#6B6555; --faint:#A8A296;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--whitewash);color:var(--ink);font-family:'Work Sans',sans-serif;padding-bottom:96px;}
+  .serif{font-family:'Instrument Serif',serif;font-style:italic;}
+  .mono{font-family:'Space Grotesk',sans-serif;}
+  .wrap{max-width:480px;margin:0 auto;}
+  header{padding:32px 24px 24px;border-bottom:1px solid var(--line);}
+  .kicker{display:flex;align-items:center;gap:8px;color:var(--aegean);font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:500;margin-bottom:8px;}
+  h1{font-size:30px;margin:0 0 16px;font-weight:400;}
+  .route{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);}
+  .route span.dash{flex:1;min-width:16px;border-top:1px dashed #C4BEA9;margin:0 4px;}
+  .balances{padding:24px;border-bottom:1px solid var(--line);}
+  .bal-block{margin-bottom:16px;}
+  .bal-block:last-child{margin-bottom:0;}
+  .bal-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .bal-head .label{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);}
+  .bal-head .amt{font-size:20px;font-weight:600;}
+  .settle{display:flex;justify-content:space-between;align-items:center;background:var(--paper);border:1px solid var(--line);padding:12px 16px;}
+  .settle .from{color:var(--terracotta);font-weight:500;}
+  .settle .to{color:var(--aegean);font-weight:500;}
+  .settle .arrow{color:var(--faint);margin:0 8px;}
+  .settle .amt{font-weight:600;font-size:14px;}
+  .empty-note{font-size:12px;color:var(--faint);}
+  .settled-note{font-size:14px;color:var(--muted);}
+  .list{padding:24px;}
+  .list-head{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:16px;}
+  .empty-state{font-size:14px;color:var(--faint);padding:32px 0;text-align:center;border:1px dashed var(--line);}
+  .stub{background:var(--paper);border:1px solid var(--line);margin-bottom:12px;position:relative;}
+  .stub-top{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 16px 8px;}
+  .stub-desc{font-size:14px;font-weight:500;}
+  .stub-meta{font-size:11px;color:var(--faint);margin-top:2px;}
+  .stub-del{background:none;border:none;color:var(--faint);cursor:pointer;padding:4px;opacity:0;transition:opacity .15s;}
+  .stub:hover .stub-del{opacity:1;}
+  .stub-del:hover{color:var(--terracotta);}
+  .stub-bottom{border-top:1px dashed var(--line);padding:8px 16px;display:flex;justify-content:space-between;align-items:center;}
+  .stub-share{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);}
+  .stub-amt{font-size:16px;font-weight:600;}
+  .fab{position:fixed;bottom:24px;left:24px;right:24px;max-width:432px;margin:0 auto;background:var(--ink);color:var(--whitewash);border:none;padding:14px;font-size:14px;letter-spacing:.05em;text-transform:uppercase;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .fab:hover{background:var(--aegean);}
+  .overlay{position:fixed;inset:0;background:rgba(27,42,74,.4);display:none;align-items:center;justify-content:center;z-index:10;}
+  .overlay.open{display:flex;}
+  .sheet{background:var(--whitewash);width:100%;max-width:432px;max-height:85vh;overflow-y:auto;padding:24px;border:1px solid var(--line);margin:16px;}
+  .sheet-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+  .sheet-head h2{margin:0;font-size:24px;font-weight:400;}
+  .sheet-head button{background:none;border:none;color:var(--faint);cursor:pointer;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+  .field input{width:100%;background:var(--paper);border:1px solid var(--line);padding:10px 12px;font-size:14px;font-family:inherit;}
+  .field input:focus{outline:none;border-color:var(--aegean);}
+  .row{display:flex;gap:12px;}
+  .row .field{flex:1;}
+  .row .field.narrow{flex:0 0 112px;}
+  .btn-group{display:flex;gap:8px;}
+  .btn-group.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .opt{flex:1;padding:10px;font-size:13px;border:1px solid var(--line);background:var(--paper);color:var(--muted);cursor:pointer;font-family:inherit;}
+  .opt.active-leg{background:var(--ink);color:var(--whitewash);border-color:var(--ink);}
+  .opt.active-cur{background:var(--ink);color:var(--whitewash);border-color:var(--ink);}
+  .opt.active-person{background:var(--aegean);color:var(--whitewash);border-color:var(--aegean);}
+  .note{font-size:11px;color:var(--faint);margin-bottom:16px;}
+  .save-btn{width:100%;background:var(--ink);color:var(--whitewash);border:none;padding:12px;font-size:14px;letter-spacing:.05em;text-transform:uppercase;font-weight:500;cursor:pointer;}
+  .save-btn:hover{background:var(--aegean);}
+  .save-btn:disabled{opacity:.5;cursor:default;}
+  .toast{position:fixed;bottom:96px;left:24px;right:24px;max-width:432px;margin:0 auto;background:var(--terracotta);color:var(--paper);font-size:14px;padding:10px 16px;display:none;justify-content:space-between;align-items:center;}
+  .toast.open{display:flex;}
+  .toast button{background:none;border:none;color:inherit;cursor:pointer;}
+  svg.icon{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.75;vertical-align:-2px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 2v20M5 12h14M7 6l5-4 5 4M7 18l5 4 5-4"/></svg>
+      Seyir Defteri · Selim &amp; Cenk
+    </div>
+    <h1 class="serif">Atina — Paros — Atina</h1>
+    <div class="route">
+      <span>Atina <span style="color:var(--faint)">30 Tem</span></span>
+      <span class="dash"></span>
+      <span>Paros <span style="color:var(--faint)">31 Tem–2 Ağu</span></span>
+      <span class="dash"></span>
+      <span>Atina <span style="color:var(--faint)">3 Ağu</span></span>
+    </div>
+  </header>
+
+  <div class="balances" id="balances"></div>
+
+  <div class="list">
+    <div class="list-head">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M4 3h16v18l-3-2-3 2-3-2-3 2-3-2-1 2V3z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      <span id="listCount">Harcamalar (0)</span>
+    </div>
+    <div id="expenseList"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span id="toastMsg"></span>
+  <button onclick="closeToast()">✕</button>
+</div>
+
+<button class="fab" onclick="openForm()">
+  <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+  Harcama ekle
+</button>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeForm()">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 class="serif">Yeni harcama</h2>
+      <button onclick="closeForm()">✕</button>
+    </div>
+
+    <div class="field">
+      <label>Ne için</label>
+      <input id="fDesc" placeholder="Örn. Akşam yemeği, Naoussa" />
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Tutar</label>
+        <input id="fAmount" class="mono" inputmode="decimal" placeholder="0.00" />
+      </div>
+      <div class="field narrow">
+        <label>Para birimi</label>
+        <div class="btn-group" id="currencyGroup"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Nerede</label>
+      <div class="btn-group" id="legGroup"></div>
+    </div>
+
+    <div class="field">
+      <label>Kim ödedi</label>
+      <div class="btn-group grid2" id="personGroup"></div>
+    </div>
+
+    <div class="note serif">Tutar otomatik olarak Selim ve Cenk arasında ikiye bölünecek.</div>
+
+    <button class="save-btn" id="saveBtn" onclick="addExpense()">Kaydet</button>
+  </div>
+</div>
+
+<script>
+const PEOPLE = ['Selim', 'Cenk'];
+const CURRENCIES = [{id:'EUR',symbol:'€',label:'Euro'},{id:'TRY',symbol:'₺',label:'TL'}];
+const LEGS = [
+  {id:'athens1', label:'Atina', date:'30 Tem'},
+  {id:'paros', label:'Paros', date:'31 Tem–2 Ağu'},
+  {id:'athens2', label:'Atina', date:'3 Ağu'},
+];
+// ====== FIREBASE AYARLARI — kendi Firebase projenin bilgilerini buraya yapıştır ======
+const firebaseConfig = {
+  apiKey: "BURAYA_YAPISTIR",
+  authDomain: "BURAYA_YAPISTIR.firebaseapp.com",
+  projectId: "BURAYA_YAPISTIR",
+  storageBucket: "BURAYA_YAPISTIR.appspot.com",
+  messagingSenderId: "BURAYA_YAPISTIR",
+  appId: "BURAYA_YAPISTIR"
+};
+// Kurulum adımları için README.md dosyasına bak.
+// ====================================================================================
+
+let db = null;
+let docRef = null;
+
+function initFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    docRef = db.collection('trips').doc('atina-paros-selim-cenk');
+    docRef.onSnapshot(
+      (doc) => {
+        expenses = (doc.exists && doc.data().expenses) ? doc.data().expenses : [];
+        renderAll();
+      },
+      (err) => {
+        console.error(err);
+        showToast('Bağlantı hatası — Firebase ayarlarını kontrol et.');
+      }
+    );
+  }catch(e){
+    console.error(e);
+    showToast('Firebase ayarları eksik — README.md dosyasına bak.');
+  }
+}
+
+let expenses = [];
+let form = { desc:'', amount:'', currency:'EUR', paidBy:PEOPLE[0], leg:'athens1' };
+
+function uid(){ return Math.random().toString(36).slice(2,10); }
+function fmt(n, currency){
+  const c = CURRENCIES.find(c=>c.id===currency);
+  return c.symbol + n.toFixed(2);
+}
+function legLabel(id){ return LEGS.find(l=>l.id===id)?.label || id; }
+
+function save(){
+  if (!docRef){ showToast('Firebase henüz bağlanmadı.'); return; }
+  docRef.set({ expenses }, { merge: true }).catch((e) => {
+    console.error(e);
+    showToast('Kaydedilemedi, tekrar deneyin.');
+  });
+}
+
+function showToast(msg){
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toast').classList.add('open');
+}
+function closeToast(){ document.getElementById('toast').classList.remove('open'); }
+
+function settleTwo(balances){
+  const [a,b] = PEOPLE;
+  const diff = balances[a] - balances[b];
+  if (Math.abs(diff) < 0.01) return null;
+  return diff > 0 ? {from:b,to:a,amount:diff/2} : {from:a,to:b,amount:-diff/2};
+}
+
+function computeBalances(){
+  const out = {};
+  CURRENCIES.forEach(c => out[c.id] = {Selim:0, Cenk:0});
+  expenses.forEach(e=>{
+    const share = e.amount/2;
+    out[e.currency][e.paidBy] += e.amount;
+    PEOPLE.forEach(p => out[e.currency][p] -= share);
+  });
+  return out;
+}
+function computeTotals(){
+  const out = {EUR:0, TRY:0};
+  expenses.forEach(e => out[e.currency] += e.amount);
+  return out;
+}
+
+function renderBalances(){
+  const balances = computeBalances();
+  const totals = computeTotals();
+  const el = document.getElementById('balances');
+  el.innerHTML = '';
+  CURRENCIES.forEach(c=>{
+    const total = totals[c.id];
+    const settlement = settleTwo(balances[c.id]);
+    const block = document.createElement('div');
+    block.className = 'bal-block';
+    let inner = `<div class="bal-head"><span class="label">${c.label} toplamı</span><span class="amt mono">${fmt(total,c.id)}</span></div>`;
+    if (total === 0){
+      inner += `<div class="empty-note">Henüz ${c.label.toLowerCase()} cinsinden kayıt yok.</div>`;
+    } else if (!settlement){
+      inner += `<div class="settled-note serif">${c.label} hesabı denk.</div>`;
+    } else {
+      inner += `<div class="settle"><div><span class="from">${settlement.from}</span><span class="arrow">→</span><span class="to">${settlement.to}</span></div><span class="amt mono">${fmt(settlement.amount,c.id)}</span></div>`;
+    }
+    block.innerHTML = inner;
+    el.appendChild(block);
+  });
+}
+
+function renderList(){
+  document.getElementById('listCount').textContent = `Harcamalar (${expenses.length})`;
+  const el = document.getElementById('expenseList');
+  if (expenses.length === 0){
+    el.innerHTML = '<div class="empty-state">Henüz kayıt yok. Aşağıdan ilk harcamayı ekle.</div>';
+    return;
+  }
+  el.innerHTML = expenses.map(e => `
+    <div class="stub">
+      <div class="stub-top">
+        <div>
+          <div class="stub-desc">${escapeHtml(e.desc)}</div>
+          <div class="stub-meta">${legLabel(e.leg)} · ${e.paidBy} ödedi</div>
+        </div>
+        <button class="stub-del" onclick="deleteExpense('${e.id}')">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
+      </div>
+      <div class="stub-bottom">
+        <span class="stub-share">Kişi başı ${fmt(e.amount/2, e.currency)}</span>
+        <span class="stub-amt mono">${fmt(e.amount, e.currency)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function renderAll(){ renderBalances(); renderList(); }
+
+function deleteExpense(id){
+  expenses = expenses.filter(e => e.id !== id);
+  save();
+  renderAll();
+}
+
+function openForm(){
+  form = { desc:'', amount:'', currency:'EUR', paidBy:PEOPLE[0], leg:'athens1' };
+  document.getElementById('fDesc').value = '';
+  document.getElementById('fAmount').value = '';
+  renderFormOptions();
+  document.getElementById('overlay').classList.add('open');
+}
+function closeForm(){ document.getElementById('overlay').classList.remove('open'); }
+
+function renderFormOptions(){
+  const curEl = document.getElementById('currencyGroup');
+  curEl.innerHTML = CURRENCIES.map(c => `<button class="opt ${form.currency===c.id?'active-cur':''}" onclick="setCurrency('${c.id}')">${c.symbol}</button>`).join('');
+
+  const legEl = document.getElementById('legGroup');
+  legEl.innerHTML = LEGS.map(l => `<button class="opt ${form.leg===l.id?'active-leg':''}" onclick="setLeg('${l.id}')">${l.label}</button>`).join('');
+
+  const personEl = document.getElementById('personGroup');
+  personEl.innerHTML = PEOPLE.map(p => `<button class="opt ${form.paidBy===p?'active-person':''}" onclick="setPaidBy('${p}')">${p}</button>`).join('');
+}
+function setCurrency(id){ form.currency = id; renderFormOptions(); }
+function setLeg(id){ form.leg = id; renderFormOptions(); }
+function setPaidBy(p){ form.paidBy = p; renderFormOptions(); }
+
+function addExpense(){
+  const desc = document.getElementById('fDesc').value.trim();
+  const amtRaw = document.getElementById('fAmount').value.replace(',', '.');
+  const amt = parseFloat(amtRaw);
+  if (!desc || !amt || amt <= 0){
+    showToast('Açıklama ve tutar gerekli.');
+    return;
+  }
+  expenses = [{ id:uid(), desc, amount:amt, currency:form.currency, paidBy:form.paidBy, leg:form.leg, ts:Date.now() }, ...expenses];
+  save();
+  renderAll();
+  closeForm();
+}
+
+initFirebase();
+renderAll();
+</script>
+</body>
+</html>
